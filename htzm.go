@@ -9,7 +9,7 @@ func test(compress uint8, logstock string) {
 	var zmclient htzmclient
 	zmclient.compress = compress
 	zmclient.logstock = logstock
-	addr := "188.190.12.89:10002"
+	addr := "10.10.13.26:10002"
 	err := zmclient.Connect(addr)
 	if err != nil {
 		fmt.Println("err Connect")
@@ -20,7 +20,7 @@ func test(compress uint8, logstock string) {
 		fmt.Println("err InitLogin")
 		return
 	}
-	markets := []string{"SH", "SZ"}
+	markets := []string{"SZ"}
 	err = zmclient.RegMarkets(markets)
 	if err != nil {
 		fmt.Println("err RegMarkets")
@@ -37,10 +37,10 @@ func test(compress uint8, logstock string) {
 }
 
 func main() {
-	go test(1, "SH600837")
-	go test(1, "SH000001")
+	// go test(1, "SH600837")
+	// go test(1, "SH000001")
 	go test(1, "SZ000001")
-	go test(1, "SZ399001")
+	// go test(1, "SZ399001")
 	for i := 0; i < 0; i++ {
 		go test(uint8(i%2), "SH600837")
 	}

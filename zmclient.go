@@ -94,7 +94,7 @@ func (sel htzmclient) handlemsg(cmd uint16, dReader *bytes.Reader) {
 	case ZMMMARKETSTATUS:
 		var status MarketStatusEx
 		binary.Read(dReader, binary.LittleEndian, &status)
-		fmt.Println("status:", status, string(status.Market_code[:]))
+		fmt.Println("status:", status, string(status.Marketcode[:]))
 	case ZMMZIPDATA:
 		// fmt.Println("ZMMZIPDATA")
 		var ZipDataHeader ZmmZipDataHeader
