@@ -8,6 +8,8 @@ import (
 	"io"
 	"net"
 	"time"
+	"log"
+	// "reflect"
 )
 
 type htzmclient struct {
@@ -17,6 +19,7 @@ type htzmclient struct {
 	totalrecvsize int
 	compress      uint8
 	logstock      string
+	logfile		  *log.Logger	
 }
 
 func (sel *htzmclient) Connect(addr string) error {
@@ -27,21 +30,22 @@ func (sel *htzmclient) Connect(addr string) error {
 func (sel htzmclient) handleStatic(dReader *bytes.Reader) {
 	var StaticInfoHeader ZmmStaticInfoHeader
 	binary.Read(dReader, binary.LittleEndian, &StaticInfoHeader)
-	fmt.Println("StaticInfoHeader:", StaticInfoHeader, string(StaticInfoHeader.Marketcode[:]))
+	
 	infobuf := make([]byte, StaticInfoHeader.Itemsize)
 	if StaticInfoHeader.Itemtype == ZMMZQDMINFO {
 		var info ZQDMInfo
 		for i := 0; i < int(StaticInfoHeader.Itemcount); i++ {
 			n, _ := dReader.Read(infobuf)
 			if n != int(StaticInfoHeader.Itemsize) {
-				fmt.Println("n!= StaticInfoHeader.Itemsize", n, StaticInfoHeader.Itemsize)
+				sel.logfile.Println("n!= StaticInfoHeader.Itemsize", n, StaticInfoHeader.Itemsize)
 				break
 			}
 			reader2 := bytes.NewReader(infobuf)
 			binary.Read(reader2, binary.LittleEndian, &info)
 			strcode := info.getCode()
 			if strcode == sel.logstock {
-				fmt.Println(string(info.Name[:12]), string(info.Pinyinname[:8]), info)
+				sel.logfile.Println("StaticInfoHeader:", StaticInfoHeader, string(StaticInfoHeader.Marketcode[:2]))
+				sel.logfile.Println(string(info.Name[:12]), string(info.Pinyinname[:4]), info)
 			}
 		}
 	}
@@ -51,13 +55,12 @@ func (sel htzmclient) handleStatic(dReader *bytes.Reader) {
 func (sel htzmclient) handlehqkz(dReader *bytes.Reader) {
 	var HqkzHeader ZmmHqkzHeader
 	binary.Read(dReader, binary.LittleEndian, &HqkzHeader)
-	fmt.Println("HqkzHeader:", HqkzHeader, string(HqkzHeader.Marketcode[:]))
 	infobuf := make([]byte, HqkzHeader.Itemsize)
 	var info CodeIf
 	switch HqkzHeader.Itemtype {
 	case ZMMHQKZSSHQ:
 		info = new(SSHQ)
-		// fmt.Println("SSHQ size:", binary.Size(info), HqkzHeader.Itemsize)
+		// sel.logfile.Println("SSHQ size:", binary.Size(info), HqkzHeader.Itemsize)
 	case ZMMHQKZSSZS:
 		info = new(SSZS)
 	case ZMMHQKZSTEPORDER:
@@ -72,15 +75,22 @@ func (sel htzmclient) handlehqkz(dReader *bytes.Reader) {
 	for i := 0; i < int(HqkzHeader.Itemcount); i++ {
 		n, _ := dReader.Read(infobuf)
 		if n != int(HqkzHeader.Itemsize) {
-			fmt.Println("n!= HqkzHeader.Itemsize", n, HqkzHeader.Itemsize)
+			sel.logfile.Println("n!= HqkzHeader.Itemsize", n, HqkzHeader.Itemsize)
 			break
 		}
 		reader2 := bytes.NewReader(infobuf)
 		binary.Read(reader2, binary.LittleEndian, info)
 		strcode := info.getCode()
-		// fmt.Print(strcode)
+		// sel.logfile.Print(strcode)
 		if strcode == sel.logstock {
-			fmt.Println(strcode, info)
+			sel.logfile.Println("HqkzHeader:", HqkzHeader, string(HqkzHeader.Marketcode[:2]))
+			sel.logfile.Println(strcode, info)
+			if ZMMHQKZSSHQ == HqkzHeader.Itemtype{
+				hhkz,_:= info.(*SSHQ)
+				// fmt.Println(info,reflect.TypeOf(info))
+				// fmt.Println(hhkz,bok)
+				fmt.Printf("%d,%s,%d,%d,%d\r\n",time.Now().UnixNano()/1000000 ,strcode,hhkz.Totalvolume,hhkz.Date,hhkz.Time)
+			}
 		}
 	}
 }
@@ -94,12 +104,12 @@ func (sel htzmclient) handlemsg(cmd uint16, dReader *bytes.Reader) {
 	case ZMMMARKETSTATUS:
 		var status MarketStatusEx
 		binary.Read(dReader, binary.LittleEndian, &status)
-		fmt.Println("status:", status, string(status.Marketcode[:]))
+		// sel.logfile.Println("status:", status, string(status.Marketcode[:2]))
 	case ZMMZIPDATA:
-		// fmt.Println("ZMMZIPDATA")
+		// sel.logfile.Println("ZMMZIPDATA")
 		var ZipDataHeader ZmmZipDataHeader
 		binary.Read(dReader, binary.LittleEndian, &ZipDataHeader)
-		fmt.Println("ZipDataHeader:", ZipDataHeader)
+		// sel.logfile.Println("ZipDataHeader:", ZipDataHeader)
 		if ZipDataHeader.Compresstype != 1 || ZipDataHeader.Rawdatalen == 0 {
 			break
 		}
@@ -110,30 +120,30 @@ func (sel htzmclient) handlemsg(cmd uint16, dReader *bytes.Reader) {
 			sel.handlemsg(ZipDataHeader.Rawcmd, bytes.NewReader(out.Bytes()))
 		}
 	case ZMMLOGINRPLY:
-		fmt.Println("ZMMLOGINRPLY")
+		sel.logfile.Println("ZMMLOGINRPLY")
 	case ZMMMARKETRPLY:
-		fmt.Println("ZMMMARKETRPLY")
+		sel.logfile.Println("ZMMMARKETRPLY")
 	default:
-		fmt.Println("unknown cmd :", cmd)
+		sel.logfile.Println("unknown cmd :", cmd)
 	}
 }
 
 func (sel *htzmclient) ReadLoop() {
-	fmt.Println("ReadLoop")
+	sel.logfile.Println("ReadLoop")
 	rdata := make([]byte, 1024*1024*16)
 	var header ZmMsgHeader
 	pos := 0
 	for {
 		select {
 		case <-sel.cDone: // connection closed
-			fmt.Println("receiving cancel signal from conn")
+			sel.logfile.Println("receiving cancel signal from conn")
 			return
 		case <-sel.sDone: // server closed
-			fmt.Println("receiving cancel signal from server")
+			sel.logfile.Println("receiving cancel signal from server")
 			return
 		default:
 			if pos == len(rdata) {
-				fmt.Println("wrong recv buff full")
+				sel.logfile.Println("wrong recv buff full")
 				break
 			}
 			n, err := sel.conn.Read(rdata[pos:])
@@ -146,15 +156,15 @@ func (sel *htzmclient) ReadLoop() {
 					binary.Read(dReader, binary.LittleEndian, &header)
 
 					if header.Length > uint32(len(rdata)) {
-						fmt.Println("wrong Length >recv buff size")
+						sel.logfile.Println("wrong Length >recv buff size")
 						return
 					}
 					if header.Length > uint32(pos-beg) {
 						break
 					}
-					fmt.Println("header:", header)
+					// sel.logfile.Println("header:", header)
 					if header.Length == uint32(binary.Size(header)) {
-						fmt.Printf("empty msg,type:%x\n", header.Cmd)
+						sel.logfile.Printf("empty msg,type:%x\n", header.Cmd)
 					} else {
 						sel.handlemsg(header.Cmd, dReader)
 					}
@@ -170,7 +180,6 @@ func (sel *htzmclient) ReadLoop() {
 }
 
 func (sel *htzmclient) heartbeat() {
-	fmt.Println("heartbeat")
 	buf := new(bytes.Buffer)
 	sel.seq++
 	var header = ZmMsgHeader{ZMMMSGBOOTCODE, 0, 0, ZMMIDLERQST, sel.seq}
@@ -184,23 +193,23 @@ func (sel *htzmclient) heartbeat() {
 	_, err := sel.conn.Write(buf.Bytes())
 
 	if err != nil {
-		fmt.Println("err 2")
+		sel.logfile.Println("err 2")
 		sel.sDone <- 1
 		sel.sDone <- 1
 	}
 }
 func (sel *htzmclient) WriteLoop() {
-
+	sel.logfile.Println("WriteLoop")
 	for {
 		select {
 		case <-sel.cDone: // connection closed
-			fmt.Println("receiving cancel signal from conn")
+			sel.logfile.Println("receiving cancel signal from conn")
 			return
 		case <-sel.sDone: // server closed
-			fmt.Println("receiving cancel signal from server")
+			sel.logfile.Println("receiving cancel signal from server")
 			return
 		default:
-			fmt.Println("totalrecvsize:", sel.totalrecvsize/1024, "kB,", sel.compress)
+			sel.logfile.Println("totalrecvsize:", sel.totalrecvsize/1024, "kB,", sel.compress)
 			sel.heartbeat()
 		}
 		time.Sleep(10 * time.Second)
@@ -231,6 +240,7 @@ func checkSum(data []byte) uint16 {
 }
 
 func (sel *htzmclient) InitLogin() error {
+	sel.logfile.Println("InitLogin  2")
 	buf := new(bytes.Buffer)
 	sel.seq++
 	sel.seq++
@@ -250,6 +260,7 @@ func (sel *htzmclient) InitLogin() error {
 }
 
 func (sel *htzmclient) RegMarkets(markets []string) error {
+	sel.logfile.Println("RegMarkets  2")
 	buf := new(bytes.Buffer)
 	sel.seq++
 	var header = ZmMsgHeader{ZMMMSGBOOTCODE, 0, 0, ZMMMARKETRQST, sel.seq}
