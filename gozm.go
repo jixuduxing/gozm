@@ -10,7 +10,7 @@ import (
 	// "reflect"
 )
 
-func test(compress uint8, logstock string,addr string,logfilename string) {
+func test(compress uint8, logstock string,addr string,logfilename string,clientname string) {
 	logfile,err := os.OpenFile(logfilename,os.O_RDWR|os.O_CREATE|os.O_TRUNC,0);
 	if err!=nil {
         log.Printf("%s\r\n",err.Error())
@@ -22,6 +22,7 @@ func test(compress uint8, logstock string,addr string,logfilename string) {
 	zmclient.compress = compress
 	zmclient.logstock = logstock
 	zmclient.logfile = logger
+	zmclient.instancename = clientname
 	zmclient.logfile.Println("test!!")
 	err = zmclient.Connect(addr)
 	if err != nil {
@@ -78,7 +79,7 @@ func main() {
 	// go test(1, "SZ399001")
 	for _,client := range result.Clients {
 		logfile := result.Logpath + client.Name +".log"
-		go test( uint8(client.Compress), client.Logcode,result.Addr, logfile)
+		go test( uint8(client.Compress), client.Logcode,result.Addr, logfile,client.Name)
 	}
 	for i := 0; i < 1000000; i++ {
 		time.Sleep(10 * time.Second)

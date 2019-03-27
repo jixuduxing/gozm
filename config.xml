@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 
 <clients>
-    <addr>188.190.12.90:10002</addr>
-    <logpath>D:/</logpath>
-    <client name="test1" logcode="SZ000001" compress="1"></client>
+    <addr1>10.10.13.26:10002</addr1>
+    <addr>127.0.0.1:10002</addr>
+    <logpath>./</logpath>
+    <client name="test1" logcode="SZ000001" compress="0"></client>
 
-    <client name="test2" logcode="SH600837" compress="0"></client>
-    <client name="test3" logcode="SH000001" compress="1"></client>
-    <client name="test4" logcode="SZ300059" compress="1"></client>
+    <client1 name="test2" logcode="SZ000001" compress="0"></client1>
+    <client1 name="test3" logcode="SZ000001" compress="1"></client1>
+
+    <client1 name="test4" logcode="SZ000001" compress="0"></client1>
     <test/>
 </clients>
